@@ -30,5 +30,10 @@ gcloud services enable artifactregistry.googleapis.com
 gcloud services enable pubsub.googleapis.com
 gcloud services enable cloudbuild.googleapis.com
 gcloud services enable iam.googleapis.com
+gcloud services enable container.googleapis.com
+
+sudo apt-get install google-cloud-sdk-gke-gcloud-auth-plugin
 
 gcloud firestore databases create --location=us-central1 --type=firestore-native > /dev/null 2> /dev/null
+
+export USE_GKE_GCLOUD_AUTH_PLUGIN=True

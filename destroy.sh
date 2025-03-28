@@ -1,8 +1,8 @@
 export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials.json"
 
-cd "03-cloudrun"
+cd "03-gke"
 
-echo "NOTE: Destroying cloud run instance."
+echo "NOTE: Destroying GKE Instance"
 
 if [ ! -d ".terraform" ]; then
     terraform init

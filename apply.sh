@@ -43,6 +43,13 @@ terraform apply -auto-approve
 # Return to the parent directory
 cd ..
 
+export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+gcloud container clusters get-credentials flask-gke \
+  --zone us-central1-a \
+  --project $project_id
+
+kubectl get nodes
+
 # Execute the validation script
 
 #./validate.sh
