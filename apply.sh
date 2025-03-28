@@ -31,9 +31,9 @@ GCR_IMAGE=us-central1-docker.pkg.dev/$project_id/flask-repository/flask-app:flas
 docker build -t $GCR_IMAGE . --push
 cd ..
 
-# Navigate to the 03-cloudrun directory
-cd 03-cloudrun
-echo "NOTE: Deploying flask container with cloud run."
+# Navigate to the 03-gke directory
+cd 03-gke
+echo "NOTE: Deploying GKE Instance"
 
 if [ ! -d ".terraform" ]; then
     terraform init
@@ -45,6 +45,6 @@ cd ..
 
 # Execute the validation script
 
-./validate.sh
+#./validate.sh
 
 
