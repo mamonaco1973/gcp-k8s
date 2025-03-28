@@ -1,0 +1,37 @@
+# ==========================================================
+# Kubernetes Deployment: CPU Stress Test Workload
+# ==========================================================
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: stress-test
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: stress
+
+  template:
+    metadata:
+      labels:
+        app: stress
+
+    spec:
+      containers:
+        - name: stress
+          image: vish/stress
+          args:
+            - -cpus
+            - "2"
+
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "256Mi"
+            limits:
+              cpu: "2000m"
+              memory: "512Mi"
