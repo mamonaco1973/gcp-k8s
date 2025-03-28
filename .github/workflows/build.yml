@@ -1,0 +1,157 @@
+name: Build Solution  # Name of the GitHub Actions workflow
+
+on:
+  workflow_dispatch:  # Allows manual triggering of the workflow from GitHub
+
+env:
+    GCP_CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}  # Environment variable holding GCP credentials
+
+jobs:
+  deploy_phase_1:
+    name: Build GAR Instance  # First phase: Setting up Google Artifact Registry (GAR)
+    runs-on: ubuntu-latest  # Specifies the runner environment
+    
+    steps:
+      - name: Checkout Code  # Step to fetch the repository code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform  # Step to install Terraform in the environment
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Apply Terraform  # Step to apply Terraform configuration for setting up GAR
+        run: |
+          echo $GCP_CREDENTIALS_JSON > credentials.json  # Save GCP credentials as a JSON file
+          export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials.json"  # Set Google application credentials
+          
+          cd "01-gar"  # Navigate to the directory containing Terraform configurations for GAR
+          echo "NOTE: Building GAR Instance."  # Log message for tracking progress
+
+          # Check if a backend configuration exists in Terraform files
+          backend=$(grep -r 'backend ' *.tf || true)
+          if [ -z "$backend" ]; then
+              echo "ERROR: No terraform backend configuration is defined."  # Error if backend is missing
+              exit 1
+          fi
+
+          terraform init  # Initialize Terraform
+          terraform apply -auto-approve  # Apply the Terraform configuration without manual approval
+
+          cd ..  # Return to the root directory
+
+  deploy_phase_2:
+    name: Build Flask Container  # Second phase: Building and pushing the Flask Docker container
+    needs: deploy_phase_1  # Depends on successful completion of phase 1
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code  # Fetch repository code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx  # Set up Docker Buildx for multi-platform builds
+        uses: docker/setup-buildx-action@v2
+        with:
+            install: true  # Ensure Buildx is installed
+
+      - name: Build Flask Container  # Build and push the Flask application container to GAR
+        run: |
+            echo $GCP_CREDENTIALS_JSON > credentials.json  # Save GCP credentials
+            export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials.json"  # Set Google application credentials
+            gcloud auth activate-service-account --key-file="./credentials.json"  # Authenticate with GCP
+            
+            cd "02-docker"  # Navigate to the Docker build directory
+            echo "NOTE: Building flask container with Docker."  # Log message
+
+            # Configure Docker to authenticate with Google Artifact Registry (GAR)
+            gcloud auth configure-docker us-central1-docker.pkg.dev -q 
+
+            # Extract project ID from credentials file
+            project_id=$(jq -r '.project_id' "../credentials.json")
+
+            # Define the image name and tag in GAR
+            GCR_IMAGE=us-central1-docker.pkg.dev/$project_id/flask-repository/flask-app:flask-app-rc1
+            
+            # Build and push the Docker image to Google Artifact Registry
+            docker build -t $GCR_IMAGE . --push
+            cd ..  # Return to the root directory
+
+  deploy_phase_3:
+    name: Build Cloud Run Instance  # Third phase: Deploying the container to Google Cloud Run
+    needs: deploy_phase_2  # Depends on successful completion of phase 2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code  # Fetch repository code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform  # Set up Terraform in the runner environment
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Apply Terraform  # Deploy Cloud Run using Terraform
+        run: |
+            echo $GCP_CREDENTIALS_JSON > credentials.json  # Save GCP credentials
+            export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials.json"  # Set Google application credentials
+            
+            cd 03-cloudrun  # Navigate to Cloud Run deployment directory
+            echo "NOTE: Building cloud run instance and deploying Flask container."  # Log message
+
+            # Check if Terraform backend is configured
+            backend=$(grep -r 'backend ' *.tf || true)
+            if [ -z "$backend" ]; then
+              echo "ERROR: No terraform backend configuration is defined."  # Error message if backend is missing
+              exit 1
+            fi
+
+            terraform init  # Initialize Terraform
+            terraform apply -auto-approve  # Deploy Cloud Run without manual confirmation
+            cd ..  # Return to the root directory
+
+  validate:
+    name: Validate Solution  # Final phase: Validating the deployed solution
+    needs: deploy_phase_3  # Depends on successful completion of phase 3
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code  # Fetch repository code
+        uses: actions/checkout@v3
+
+      - name: Validate Solution  # Verify Cloud Run deployment and test API endpoint
+        run: |
+            echo $GCP_CREDENTIALS_JSON > credentials.json  # Save GCP credentials
+            export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials.json"  # Set Google application credentials
+            gcloud auth activate-service-account --key-file="./credentials.json"  # Authenticate with GCP
+            
+            # Extract project ID from credentials file
+            project_id=$(jq -r '.project_id' "./credentials.json")
+            gcloud config set project $project_id  # Set the active GCP project
+
+            # Retrieve the Cloud Run service URL
+            SERVICE_URL=$(gcloud run services list --platform managed --format="value(URL)" | grep "flask-app-service")
+
+            # Ensure a valid service URL is returned
+            if [[ -z "$SERVICE_URL" || "$SERVICE_URL" == "None" ]]; then
+            echo "ERROR: Service URL for cloud run is not found. Please check if the service exists and try again."
+                exit 1
+            fi
+
+            # Wait until the API endpoint is accessible
+            echo "NOTE: Waiting for the API to be reachable..."
+
+            while true; do
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SERVICE_URL/candidate/John%20Smith")
+
+              if [[ "$HTTP_STATUS" == "200" ]]; then
+                  echo "NOTE: API is now reachable."  # API is available
+                  break
+              else
+                  echo "WARNING: API is not yet reachable (HTTP $HTTP_STATUS). Retrying..."  # API not ready yet
+                  sleep 30  # Wait before retrying
+              fi
+            done
+
+            # Navigate to the test script directory
+            cd ./02-docker
+            echo "NOTE: Testing the GCP Cloud Run Solution."
+            echo "NOTE: URL for GCP Cloud Run is $SERVICE_URL/gtg?details=true"
+            
+            # Execute the test script
+            ./test_candidates.py "$SERVICE_URL"
