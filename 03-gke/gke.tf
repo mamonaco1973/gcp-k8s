@@ -19,7 +19,7 @@ resource "google_container_cluster" "primary" {
 
 
 resource "google_container_node_pool" "primary_nodes" {
-  name     = "${var.gke_cluster_name}-node-pool"
+  name     = "default-node-pool"
   location = var.zone
   cluster  = google_container_cluster.primary.name
 

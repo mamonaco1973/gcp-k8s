@@ -57,9 +57,10 @@ gcloud container clusters get-credentials flask-gke \
   --project $project_id
 
 kubectl get nodes
+kubectl apply -f flask-app.yaml
 
 # Execute the validation script
 
-#./validate.sh
+./validate.sh
 
 
