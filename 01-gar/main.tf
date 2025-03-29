@@ -1,21 +1,25 @@
-# Google Cloud Provider Configuration
-# Configures the Google Cloud provider using project details and credentials from a JSON file.
+# ====================================================================
+# GOOGLE CLOUD PROVIDER CONFIGURATION
+# Connects Terraform to GCP using a service account key file.
+# All GCP resources will be provisioned under this identity and project.
+# ====================================================================
 provider "google" {
-  project     = local.credentials.project_id             # Specifies the project ID extracted from the decoded credentials file.
-  credentials = file("../credentials.json")               # Path to the credentials JSON file for Google Cloud authentication.
+  project     = local.credentials.project_id       # 🆔 Project ID pulled from your decoded credentials file
+                                                   # 🔐 Do not hardcode this — use local context for reuse and portability
+
+  credentials = file("../credentials.json")        # 📄 Full path to the service account key JSON
+                                                   # ⚠️ Keep this file out of source control — treat it like a password
 }
 
-# Local Variables
-# Reads and decodes the credentials JSON file to extract useful details like project ID and service account email.
+# ====================================================================
+# LOCAL VARIABLES FOR GCP CREDENTIALS
+# Parses and stores values from the service account key file.
+# These locals are used everywhere else to keep config DRY and secure.
+# ====================================================================
 locals {
-  credentials            = jsondecode(file("../credentials.json"))  # Decodes the JSON file into a map for easier access.
-  service_account_email  = local.credentials.client_email          # Extracts the service account email from the decoded JSON map.
-}
+  credentials = jsondecode(file("../credentials.json"))  # 🧠 Decodes the raw JSON file into a usable map
+                                                         # Contains keys like "project_id", "client_email", etc.
 
-# Firestore IAM Member Configuration
-# Assigns Firestore user role to the service account for accessing Firestore resources in the project.
-resource "google_project_iam_member" "flask_firestore_access" {
-  project = local.credentials.project_id                      # Specifies the project ID from local credentials.
-  role    = "roles/datastore.user"                            # Role assigned to the member, allowing Firestore access.
-  member  = "serviceAccount:${local.service_account_email}"   # Service account email receiving the role.
+  service_account_email = local.credentials.client_email # 📬 Pulls out the service account email from the decoded map
+                                                         # Used for IAM bindings and impersonation logic
 }
