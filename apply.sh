@@ -40,6 +40,14 @@ if [ ! -d ".terraform" ]; then
 fi
 terraform apply -auto-approve
 
+# Replace ${GCR_NAME} in the deployment template
+
+sed "s|\$IMAGE|$GCR_IMAGE|g" yaml/flask-app.yaml.tmpl > ../flask-app.yaml || {
+    echo "ERROR: Failed to generate Kubernetes deployment file. Exiting."
+    exit 1
+}
+
+
 # Return to the parent directory
 cd ..
 

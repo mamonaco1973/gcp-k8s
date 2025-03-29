@@ -9,7 +9,7 @@ metadata:
   name: stress-test
 
 spec:
-  replicas: 1
+  replicas: 4
 
   selector:
     matchLabels:
@@ -30,7 +30,7 @@ spec:
 
           resources:
             requests:
-              cpu: "1000m"
+              cpu: "2000m"
               memory: "256Mi"
             limits:
               cpu: "2000m"

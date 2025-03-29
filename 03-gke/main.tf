@@ -15,6 +15,15 @@ locals {
   service_account_email = local.credentials.client_email          # Retrieves the service account email from the decoded JSON map.
 }
 
+
+data "google_client_config" "default" {}
+
+data "google_container_cluster" "primary" {
+  name     = google_container_cluster.primary.name
+  location = google_container_cluster.primary.location
+}
+
+
 # # Google Cloud Run Service
 # # Deploys a Cloud Run service named "flask-app-service" in the "us-central1" region.
 

@@ -4,4 +4,6 @@
 *.terraform.lock.hcl
 *.terraform.*
 credentials.json
+flask-app.yaml
+	
 
