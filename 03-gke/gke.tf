@@ -19,6 +19,10 @@ resource "google_container_cluster" "primary" {
     workload_pool = "${local.credentials.project_id}.svc.id.goog"  
     # 🔐 Enable Workload Identity to let K8s service accounts impersonate GCP service accounts
   }
+
+  private_cluster_config {
+     enable_private_nodes    = true              # ⛔ No public IPs on nodes
+  }
 }
 
 # ====================================================================
