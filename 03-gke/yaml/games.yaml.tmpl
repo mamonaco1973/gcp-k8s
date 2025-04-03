@@ -1,0 +1,245 @@
+# ========================================================
+# Create games namespace
+# ========================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: games
+
+---
+# ========================================================
+# Tetris Deployment
+# Manages the pod lifecycle for the game application
+# ========================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tetris  # Unique identifier for this deployment
+  namespace: games
+spec:
+  replicas: 1  # Run exactly one instance of the game pod
+  selector:  # Links the deployment to pods with these labels
+    matchLabels:
+      app: tetris
+  template:  # Blueprint for creating new pods
+    metadata:
+      labels:
+        app: tetris  # Must match selector.matchLabels
+    spec:
+      nodeSelector:  # Constrains pods to nodes with this label
+        nodegroup: game-nodes
+      containers:
+        - name: tetris  # Container name (visible in logs/dashboard)
+          image: us-central1-docker.pkg.dev/$project_id/games-repository/tetris-rc1
+          ports:
+            - containerPort: 8000  # The port the game server listens on
+
+---
+# ========================================================
+# Tetris Service
+# Provides stable network access to the game pods
+# ========================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: tetris-service  # DNS name for internal cluster access
+  namespace: games
+spec:
+  selector:  # Routes traffic to pods with this label
+    app: tetris
+  ports:
+    - protocol: TCP  # Standard protocol for HTTP traffic
+      port: 80  # External service port
+      targetPort: 8000  # Forwards to container's port 8000
+
+---
+# ========================================================
+# Tetris Ingress
+# Manages external HTTP access to the service
+# ========================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tetris-ingress
+  namespace: games
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # Route /games/tetris and everything under it
+          - path: /games/tetris
+            pathType: Prefix
+            backend:
+              service:
+                name: tetris-service
+                port:
+                  number: 80
+          - path: /games/tetris/
+            pathType: Prefix
+            backend:
+              service:
+                name: tetris-service
+                port:
+                  number: 80
+
+---
+# ========================================================
+# Frogger Deployment
+# Manages the pod lifecycle for the game application
+# ========================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frogger  # Unique identifier for this deployment
+  namespace: games
+spec:
+  replicas: 1  # Run exactly one instance of the game pod
+  selector:  # Links the deployment to pods with these labels
+    matchLabels:
+      app: frogger
+  template:  # Blueprint for creating new pods
+    metadata:
+      labels:
+        app: frogger  # Must match selector.matchLabels
+    spec:
+      nodeSelector:  # Constrains pods to nodes with this label
+        nodegroup: game-nodes
+      containers:
+        - name: frogger  # Container name (visible in logs/dashboard)
+          image: us-central1-docker.pkg.dev/$project_id/games-repository/frogger-rc1
+          ports:
+            - containerPort: 8000  # The port the game server listens on
+
+---
+# ========================================================
+# Frogger Service
+# Provides stable network access to the game pods
+# ========================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: frogger-service  # DNS name for internal cluster access
+  namespace: games
+spec:
+  selector:  # Routes traffic to pods with this label
+    app: frogger
+  ports:
+    - protocol: TCP  # Standard protocol for HTTP traffic
+      port: 80  # External service port
+      targetPort: 8000  # Forwards to container's port 8000
+
+---
+# ========================================================
+# Frogger Ingress
+# Manages external HTTP access to the service
+# ========================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frogger-ingress
+  namespace: games
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # Route /games/frogger and everything under it
+          - path: /games/frogger
+            pathType: Prefix
+            backend:
+              service:
+                name: frogger-service
+                port:
+                  number: 80
+          - path: /games/frogger/
+            pathType: Prefix
+            backend:
+              service:
+                name: frogger-service
+                port:
+                  number: 80
+
+---
+# ========================================================
+# Breakout Deployment
+# Manages the pod lifecycle for the game application
+# ========================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: breakout  # Unique identifier for this deployment
+  namespace: games
+spec:
+  replicas: 1  # Run exactly one instance of the game pod
+  selector:  # Links the deployment to pods with these labels
+    matchLabels:
+      app: breakout
+  template:  # Blueprint for creating new pods
+    metadata:
+      labels:
+        app: breakout  # Must match selector.matchLabels
+    spec:
+      nodeSelector:  # Constrains pods to nodes with this label
+        nodegroup: game-nodes
+      containers:
+        - name: breakout  # Container name (visible in logs/dashboard)
+          image: $us-central1-docker.pkg.dev/$project_id/games-repository/breakout-rc1
+          ports:
+            - containerPort: 8000  # The port the game server listens on
+
+---
+# ========================================================
+# Breakout Service
+# Provides stable network access to the game pods
+# ========================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: breakout-service  # DNS name for internal cluster access
+  namespace: games
+spec:
+  selector:  # Routes traffic to pods with this label
+    app: breakout
+  ports:
+    - protocol: TCP  # Standard protocol for HTTP traffic
+      port: 80  # External service port
+      targetPort: 8000  # Forwards to container's port 8000
+
+---
+# ========================================================
+# Breakout Ingress
+# Manages external HTTP access to the service
+# ========================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: breakout-ingress
+  namespace: games
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # Route /games/breakout and everything under it
+          - path: /games/breakout
+            pathType: Prefix
+            backend:
+              service:
+                name: breakout-service
+                port:
+                  number: 80
+          - path: /games/breakout/
+            pathType: Prefix
+            backend:
+              service:
+                name: breakout-service
+                port:
+                  number: 80
