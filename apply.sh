@@ -79,6 +79,7 @@ gcloud container clusters get-credentials flask-gke \
 
 kubectl get nodes
 kubectl apply -f flask-app.yaml
+kubectl apply -f games.yaml
 
 # Execute the validation script
 

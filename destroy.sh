@@ -1,5 +1,8 @@
 export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials.json"
 
+kubectl delete -f flask-app.yaml
+kubectl delete -f games.yaml
+
 cd "03-gke"
 
 echo "NOTE: Destroying GKE Instance"
