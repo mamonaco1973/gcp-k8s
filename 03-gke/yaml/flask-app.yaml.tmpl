@@ -7,31 +7,46 @@ metadata:
   name: flask-app
 
 spec:
-  replicas: 2
+  replicas: 2  # Number of replicas to run
+
   selector:
     matchLabels:
-      app: flask-app
+      app: flask-app  # Selector matches the pod label
 
   template:
     metadata:
       labels:
-        app: flask-app
+        app: flask-app  # Label applied to each pod
 
     spec:
-      serviceAccountName: firestore-access-sa
+      serviceAccountName: firestore-access-sa  # GKE service account for Workload Identity
+
       containers:
         - name: flask-app
-          image: $IMAGE
+          image: us-central1-docker.pkg.dev/$project_id/flask-repository/flask-app:flask-app-rc1
+
           ports:
-            - containerPort: 8000
+            - containerPort: 8000  # Flask app listens on port 8000
+
           livenessProbe:
             httpGet:
               path: /gtg
               port: 8000
             initialDelaySeconds: 60
             periodSeconds: 30
-            failureThreshold: 6
-            timeoutSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /gtg
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
 
 ---
 
@@ -45,14 +60,14 @@ metadata:
 
 spec:
   selector:
-    app: flask-app
+    app: flask-app  # Targets pods with this label
 
   ports:
     - protocol: TCP
-      port: 80
-      targetPort: 8000
+      port: 80         # Exposes port 80 inside the cluster
+      targetPort: 8000 # Redirects to container port 8000
 
-  type: ClusterIP   # ✅ Changed from LoadBalancer to ClusterIP for NGINX Ingress
+  type: ClusterIP  # Internal-only service used by Ingress
 
 ---
 
@@ -70,8 +85,8 @@ spec:
     kind: Deployment
     name: flask-app
 
-  minReplicas: 2
-  maxReplicas: 5
+  minReplicas: 2  # Minimum number of pods to maintain
+  maxReplicas: 5  # Maximum pods to scale up to
 
   metrics:
     - type: Resource
@@ -79,21 +94,22 @@ spec:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 60
+          averageUtilization: 60  # Target 60% CPU usage before scaling
 
 ---
 
 # =============================================================
-# Ingress: flask-app-ingress (NGINX Exposes This)
+# Ingress: flask-app-ingress (NGINX exposes this app externally)
 # =============================================================
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: flask-app-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/rewrite-target: /  # Rewrites URL to root path of app
+
 spec:
-  ingressClassName: nginx   # ✅ Modern Ingress class field
+  ingressClassName: nginx  # Explicitly targets nginx ingress controller
   rules:
     - http:
         paths:

@@ -61,7 +61,7 @@ terraform apply -auto-approve
 
 # Replace ${GCR_NAME} in the deployment template
 
-sed "s|\$IMAGE|$GCR_IMAGE|g" yaml/flask-app.yaml.tmpl > ../flask-app.yaml || {
+sed "s|\$project_id|$project_id|g" yaml/flask-app.yaml.tmpl > ../flask-app.yaml || {
     echo "ERROR: Failed to generate Kubernetes deployment file. Exiting."
     exit 1
 }
