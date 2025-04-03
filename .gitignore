@@ -5,5 +5,7 @@
 *.terraform.*
 credentials.json
 flask-app.yaml
+games.yaml
+
 	
 
