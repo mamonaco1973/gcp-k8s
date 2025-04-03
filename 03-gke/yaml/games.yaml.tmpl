@@ -31,7 +31,7 @@ spec:
         nodegroup: game-nodes
       containers:
         - name: tetris  # Container name (visible in logs/dashboard)
-          image: us-central1-docker.pkg.dev/$project_id/games-repository/tetris-rc1
+          image: us-central1-docker.pkg.dev/$project_id/games-repository/tetris:rc1
           ports:
             - containerPort: 8000  # The port the game server listens on
 
@@ -110,7 +110,7 @@ spec:
         nodegroup: game-nodes
       containers:
         - name: frogger  # Container name (visible in logs/dashboard)
-          image: us-central1-docker.pkg.dev/$project_id/games-repository/frogger-rc1
+          image: us-central1-docker.pkg.dev/$project_id/games-repository/frogger:rc1
           ports:
             - containerPort: 8000  # The port the game server listens on
 
@@ -189,7 +189,7 @@ spec:
         nodegroup: game-nodes
       containers:
         - name: breakout  # Container name (visible in logs/dashboard)
-          image: $us-central1-docker.pkg.dev/$project_id/games-repository/breakout-rc1
+          image: us-central1-docker.pkg.dev/$project_id/games-repository:breakout-rc1
           ports:
             - containerPort: 8000  # The port the game server listens on
 
