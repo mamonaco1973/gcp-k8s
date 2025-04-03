@@ -27,11 +27,6 @@ echo "NOTE: Building flask container with Docker."
 
 gcloud auth configure-docker us-central1-docker.pkg.dev -q 
 project_id=$(jq -r '.project_id' "../credentials.json")
-GCR_IMAGE=us-central1-docker.pkg.dev/$project_id/flask-repository/flask-app:flask-app-rc1
-
-cd flask-app
-docker build -t $GCR_IMAGE . --push
-cd ..
 
 GCR_IMAGE=us-central1-docker.pkg.dev/$project_id/games-repository/tetris:rc1
 cd tetris
@@ -45,6 +40,11 @@ cd ..
 
 GCR_IMAGE=us-central1-docker.pkg.dev/$project_id/games-repository/breakout:rc1
 cd breakout
+docker build -t $GCR_IMAGE . --push
+cd ..
+
+GCR_IMAGE=us-central1-docker.pkg.dev/$project_id/flask-repository/flask-app:flask-app-rc1
+cd flask-app
 docker build -t $GCR_IMAGE . --push
 cd ..
 
