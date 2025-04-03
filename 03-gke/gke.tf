@@ -48,6 +48,24 @@ resource "google_container_node_pool" "primary_nodes" {
   initial_node_count = 1   # Start with 1 node initially (autoscaler will take over after)
 }
 
+
+# ====================================================================
+# GKE NODE POOL: GAME NODES
+# ====================================================================
+resource "google_container_node_pool" "primary_nodes" {
+  name     = "game-node-pool"                           # Clean, non-redundant node pool name
+  location = var.zone                                   # Same zone as the cluster
+  cluster  = google_container_cluster.primary.name      # Link this node pool to the cluster above
+
+  node_config {
+    machine_type = "e2-standard-4"                      # 💪 Choose a decent VM size for actual workloads
+    oauth_scopes = [
+      "https://www.googleapis.com/auth/cloud-platform"  # Full GCP access from nodes (needed for logging, monitoring, etc.)
+    ]
+  }
+  node_count =  1
+}
+
 # ====================================================================
 # KUBERNETES PROVIDER: CONNECTS TERRAFORM TO GKE API SERVER
 # ====================================================================
