@@ -38,6 +38,16 @@ cd tetris
 docker build -t $GCR_IMAGE . --push
 cd ..
 
+GCR_IMAGE=us-central1-docker.pkg.dev/$project_id/games-repository/frogger:rc1
+cd frogger
+docker build -t $GCR_IMAGE . --push
+cd ..
+
+GCR_IMAGE=us-central1-docker.pkg.dev/$project_id/games-repository/breakout:rc1
+cd breakout
+docker build -t $GCR_IMAGE . --push
+cd ..
+
 cd ..
 
 # Navigate to the 03-gke directory
