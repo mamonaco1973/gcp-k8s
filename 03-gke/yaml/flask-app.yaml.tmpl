@@ -106,17 +106,18 @@ kind: Ingress
 metadata:
   name: flask-app-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /  # Rewrites URL to root path of app
-
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
-  ingressClassName: nginx  # Explicitly targets nginx ingress controller
+  ingressClassName: nginx
   rules:
     - http:
         paths:
-          - path: /
-            pathType: Prefix
+          - path: /flask-app/api/(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: flask-app-service
                 port:
                   number: 80
+
