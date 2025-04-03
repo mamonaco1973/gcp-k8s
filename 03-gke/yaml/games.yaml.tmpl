@@ -173,7 +173,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: breakout  # Unique identifier for this deployment
+  name: breakout  # Unique identifier for this deployments
   namespace: games
 spec:
   replicas: 1  # Run exactly one instance of the game pod
@@ -189,7 +189,7 @@ spec:
         nodegroup: game-nodes
       containers:
         - name: breakout  # Container name (visible in logs/dashboard)
-          image: us-central1-docker.pkg.dev/$project_id/games-repository:breakout-rc1
+          image: us-central1-docker.pkg.dev/$project_id/games-repository/breakout:rc1
           ports:
             - containerPort: 8000  # The port the game server listens on
 
