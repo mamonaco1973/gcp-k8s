@@ -35,7 +35,7 @@ fi
 # STEP 2: Wait Until Flask API Is Ready and Responding (HTTP 200)
 # ---------------------------------------------------------
 while true; do
-    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://$INGRESS_IP/candidate/John%20Smith")
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://$INGRESS_IP/flask-app/api/candidate/John%20Smith")
 
     if [[ "$HTTP_STATUS" == "200" ]]; then
         echo "NOTE: API is now reachable via Ingress."
@@ -52,7 +52,7 @@ done
 
 cd ./02-docker
 
-SERVICE_URL="http://$INGRESS_IP"
+SERVICE_URL="http://$INGRESS_IP/flask-app/api"
 
 echo "NOTE: Testing the GKE + Ingress deployment."
 echo "NOTE: URL for GKE Deployment is $SERVICE_URL/gtg?details=true"
