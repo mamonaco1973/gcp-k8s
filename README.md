@@ -2,7 +2,7 @@
 
 Welcome to **Video 3** of the [Kubernetes In the Cloud](https://github.com/mamonaco1973/cloud-k8s-intro/blob/main/README.md) series.
 
-**This video complements the [GCP Managed Instance Groups](https://github.com/mamonaco1973/gcp-flask-mig/blob/main/README.md) and the [Simple GCP Containers](https://github.com/mamonaco1973/gcp-flask-container/blob/main/README.mdd) projects**, where we deployed a simple Python-based microservice using the Flask framework with different cloud services.
+**This video complements the [GCP Managed Instance Groups](https://github.com/mamonaco1973/gcp-flask-mig/blob/main/README.md) and the [Simple GCP Containers](https://github.com/mamonaco1973/gcp-flask-container/blob/main/README.md) projects**, where we deployed a simple Python-based microservice using the Flask framework with different cloud services.
 
 This is a **fully automated deployment** of containerized microservices and web apps with **Google Kubernetes Engine (GKE)** — powered by Terraform and shell scripting.
 
