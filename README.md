@@ -1,4 +1,4 @@
-# Containerizing Applications with Amazon EKS (Elastic Kubernetes Service)
+# Containerizing Applications with Google Kubernetes Engine (GKE)
 
 Welcome to **Video 3** of the [Kubernetes In the Cloud](https://github.com/mamonaco1973/cloud-k8s-intro/blob/main/README.md) series.
 
