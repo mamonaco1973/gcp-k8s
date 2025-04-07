@@ -242,3 +242,101 @@ The build process is organized into four phases:
  - **Purpose**: Loads javascript breakout game for usage in a Web Browser.
 
       ![eks](./diagrams/breakout.png)
+
+## Kubernetes Cluster Validation and Autoscaling Test
+
+This guide walks through validating your Kubernetes cluster with `kubectl` and testing autoscaling behavior using a simple stress test.
+
+---
+
+### Step 1: Validate Pod Deployments
+
+Start by listing the current pods in the default namespace:
+
+```bash
+kubectl get pods
+```
+
+Then check for any applications deployed in the custom `games` namespace:
+
+```bash
+kubectl get pods -n games
+```
+
+---
+
+### Step 2: Check Deployment Health
+
+Verify the `Deployment` resources:
+
+```bash
+kubectl get deployments
+kubectl get deployments -n games
+```
+
+---
+
+### Step 3: Confirm Ingress Setup
+
+Check the Ingress resources in both namespaces:
+
+```bash
+kubectl get ingress
+kubectl get ingress -n games
+```
+
+---
+
+### Step 4: Check Node Availability
+
+List the current nodes in your cluster:
+
+```bash
+kubectl get nodes
+```
+
+---
+
+### Step 5: Simulate Load with a Stress Test
+
+Apply a resource-intensive workload:
+
+```bash
+kubectl apply -f stress.yaml
+```
+
+⏱️ **Wait ~5 minutes** to allow autoscaling to respond.
+
+Then check the nodes again:
+
+```bash
+kubectl get nodes
+```
+
+---
+
+### Step 6: Clean Up the Load Generator
+
+Remove the stress workload:
+
+```bash
+kubectl delete -f stress.yaml
+```
+
+⏱️ **Wait ~5 minutes** for the cluster to scale back down.
+
+Check node status again:
+
+```bash
+kubectl get nodes
+```
+
+---
+
+### Summary
+
+This process validates:
+
+- Pod and deployment readiness
+- Ingress configuration
+- Node availability and autoscaler behavior
