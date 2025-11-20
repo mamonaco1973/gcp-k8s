@@ -2,7 +2,7 @@
 echo "NOTE: Validating that required commands are found in the PATH."
 
 # List of required commands
-commands=("gcloud" "docker" "terraform")
+commands=("gcloud" "docker" "terraform" "kubectl" "jq")
 
 # Flag to track if all commands are found
 all_found=true
