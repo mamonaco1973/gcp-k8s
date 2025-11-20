@@ -1,6 +1,6 @@
 #!/bin/bash
 # Exit immediately if a command exits with a non-zero status (optional safety).
-# set -e  
+set -e  
 
 # Run the environment check script to ensure required files/configs are present.
 ./check_env.sh
