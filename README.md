@@ -48,8 +48,8 @@ Regenerate with `python3 make_diagram.py`.
 | Path | Returns |
 |---|---|
 | `GET /flask-app/api/gtg` | 200; with `?details=true`, connection details |
-| `GET /flask-app/api/<name>` | the candidate, or 404 |
-| `POST /flask-app/api/<name>` | `{"CandidateName": <name>}`, or 500 |
+| `GET /flask-app/api/candidate/<name>` | the candidate, or 404 |
+| `POST /flask-app/api/candidate/<name>` | `{"CandidateName": <name>}`, or 500 |
 | `GET /flask-app/api/candidates` | every candidate, or 404 |
 | `GET /games/tetris` | Tetris |
 | `GET /games/frogger` | Frogger |
