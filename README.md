@@ -1,342 +1,153 @@
-# Containerizing Applications with Google Kubernetes Engine (GKE)
+# Kubernetes on GCP: GKE with NGINX Ingress, Artifact Registry and Firestore
 
-Welcome to **Video 3** of the [Kubernetes In the Cloud](https://github.com/mamonaco1973/cloud-k8s-intro/blob/main/README.md) series.
+Video 3 of the [Kubernetes in the Cloud](https://github.com/mamonaco1973/cloud-k8s-intro/blob/main/README.md)
+series. The candidate microservice from
+[GCP Managed Instance Groups](https://github.com/mamonaco1973/gcp-flask-mig) and
+[Simple GCP Containers](https://github.com/mamonaco1973/gcp-flask-container)
+runs here on **Google Kubernetes Engine**, next to three browser games
+(Tetris, Frogger and Breakout). Images live in **Artifact Registry**, the
+Flask pods store candidates in **Firestore** through Workload Identity, and
+an **NGINX ingress controller** behind one load balancer routes to
+everything. Terraform builds the infrastructure and the ingress controller;
+`kubectl` deploys the apps.
 
-**This video complements the [GCP Managed Instance Groups](https://github.com/mamonaco1973/gcp-flask-mig/blob/main/README.md) and the [Simple GCP Containers](https://github.com/mamonaco1973/gcp-flask-container/blob/main/README.md) projects**, where we deployed a simple Python-based microservice using the Flask framework with different cloud services.
+![Tour of the build in the Google Cloud console](diagrams/consoles.gif)
 
-This is a **fully automated deployment** of containerized microservices and web apps with **Google Kubernetes Engine (GKE)** — powered by Terraform and shell scripting.
+| Piece | Where | Role |
+|---|---|---|
+| **gke-vpc** | `us-central1` | subnet `gke-subnet` (`10.20.0.0/16`); Cloud Router and NAT (`gke-nat`) for outbound traffic from the private nodes |
+| **flask-gke** | GKE, zonal, `us-central1-a` | private nodes (no public IPs); Workload Identity pool `<project>.svc.id.goog` |
+| **default-node-pool** | GKE | `e2-standard-4`, 1 to 4 nodes with autoscaling; runs `flask-app` |
+| **game-node-pool** | GKE | `e2-standard-4`, 1 node, labelled `nodegroup=game-nodes`; runs the games in the `games` namespace |
+| **nginx-ingress** | Helm, `ingress-nginx` | NGINX ingress controller; its `LoadBalancer` service gets an external network load balancer |
+| **flask-app** | Deployment | 2 replicas, scaled 2 to 5 by an HPA at 60% CPU; `/gtg` probes; service account `firestore-access-sa` |
+| **tetris**, **frogger**, **breakout** | Deployments, `games` | one replica each |
+| **Firestore** | `(default)`, native mode | `candidates` collection; created by `api_setup.sh` |
+| **Google service account** | IAM | `roles/datastore.user`; `firestore-access-sa` impersonates it through `roles/iam.workloadIdentityUser` |
+| **flask-repository**, **games-repository** | Artifact Registry, `us-central1` | the images |
 
-We'll build and deploy:
+## Architecture
 
-- **A document database-backed microservice** using:  
-  - **Google Firestore** for fast, serverless NoSQL storage.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="architecture-dark.svg">
+  <img alt="Requests from the internet reach the network load balancer created for the NGINX ingress controller's service in the flask-gke cluster, a zonal GKE cluster in us-central1-a with private nodes behind Cloud NAT. The ingress routes /flask-app/api to the Flask pods on the default-node-pool (e2-standard-4, one to four nodes, autoscaled) and /games paths to the Tetris, Frogger and Breakout pods on the single-node game-node-pool. The Flask pods use the firestore-access-sa Kubernetes service account, bound through Workload Identity to a Google service account with roles/datastore.user, to read and write Firestore. Both pools pull images from Artifact Registry." src="architecture-light.svg">
+</picture>
 
-- **A Docker container** for the Flask microservice, optimized for deployment to **Google Kubernetes Engine (GKE)**.
+Regenerate with `python3 make_diagram.py`.
 
-- **Additional standalone Docker containers** that run classic games like:  
-  - **[Tetris](https://gist.github.com/straker/3c98304f8a6a9174efd8292800891ea1)**  
-  - **[Frogger](https://gist.github.com/straker/82a4368849cbd441b05bd6a044f2b2d3)**  
-  - **[Breakout](https://gist.github.com/straker/98a2aed6a7686d26c04810f08bfaf66b)**
+- **`01-gar/`**: the two Artifact Registry repositories.
+- **`02-docker/`**: the Flask app and the three games, each with its
+  `Dockerfile`, plus the `test_candidates.py` smoke test.
+- **`03-gke/`**: the network and NAT, the cluster and both pools, the
+  Workload Identity binding (`security.tf`), the NGINX Helm release, and the
+  manifest templates in `yaml/`.
+- **`stress.yaml`**: a CPU load generator for the autoscaling test.
 
-- **Cloud-native container registry workflows**, pushing all images to:  
-  - **Google Artifact Registry**
+## Endpoints
 
-- **Kubernetes workloads on GKE**, managing containerized applications at scale.
+| Path | Returns |
+|---|---|
+| `GET /flask-app/api/gtg` | 200; with `?details=true`, connection details |
+| `GET /flask-app/api/<name>` | the candidate, or 404 |
+| `POST /flask-app/api/<name>` | `{"CandidateName": <name>}`, or 500 |
+| `GET /flask-app/api/candidates` | every candidate, or 404 |
+| `GET /games/tetris` | Tetris |
+| `GET /games/frogger` | Frogger |
+| `GET /games/breakout` | Breakout |
 
-- **Kubernetes manifests** including **Deployments**, **Services**, and **Ingress** resources for scalable, fault-tolerant workloads.
+The games are [Tetris](https://gist.github.com/straker/3c98304f8a6a9174efd8292800891ea1),
+[Frogger](https://gist.github.com/straker/82a4368849cbd441b05bd6a044f2b2d3)
+and [Breakout](https://gist.github.com/straker/98a2aed6a7686d26c04810f08bfaf66b)
+by Steven Lambert, served by NGINX.
 
-- **NGINX as a unified Ingress controller**, exposing all services and games behind a single **Google Cloud Load Balancer**.
-
-## Is Google Kubernetes Engine (GKE) PaaS or IaaS?
-
-When deploying Kubernetes with **Google Kubernetes Engine (GKE)**, you might ask:
-
-> Is GKE considered Infrastructure as a Service (IaaS) or Platform as a Service (PaaS)?
-
-GKE lets you define compute, scaling, and networking options — that feels like IaaS. But it also manages the Kubernetes control plane, automates provisioning, and abstracts away much of the operational overhead — which leans toward PaaS.
-
-The best answer: **GKE delivers a PaaS-like experience built on IaaS foundations**. It blends declarative APIs with Google Cloud’s native infrastructure provisioning.
-
----
-
-### Managed Control Plane, Declarative Infrastructure
-
-With **GKE**, you never install or manage the Kubernetes control plane. Google Cloud handles all of that for you — including:
-
-- Control plane availability and scaling  
-- Kubernetes version upgrades and patching  
-- Integrated observability and security  
-
-You don’t manually launch Compute Engine instances for nodes. Instead, you define node pool settings, and GKE provisions the necessary compute infrastructure for you — all through a **declarative, hands-off experience** that feels like PaaS.
-
----
-
-### Autoscaling and Node Management: IaaS Under the Hood
-
-While you don’t manage VMs directly, GKE uses **managed instance groups (MIGs)** to provision and scale worker nodes. You define:
-
-- Machine types and disk sizes  
-- Minimum and maximum node counts  
-- Auto-scaling behavior based on workload metrics  
-
-GCP then manages:
-
-- VM provisioning and health checks  
-- Auto-repair and rolling updates  
-- Multi-zone and regional availability  
-
-It’s all backed by traditional IaaS — just orchestrated through Kubernetes abstractions.
-
----
-
-### Load Balancer Provisioning
-
-GKE integrates tightly with Google Cloud Load Balancing. When you create a Kubernetes `Service` of type `LoadBalancer`, GCP automatically provisions a:
-
-- **Global HTTP(S) Load Balancer** or **regional network load balancer**, depending on configuration and annotations.
-
-You don’t need to manually configure health checks or backend services — the Kubernetes **GKE controller manager** handles that. This automation is a hallmark of PaaS: describe the service, and the infrastructure follows.
-
----
-
-### Labels: The Glue Behind the Scenes
-
-In GKE, **labels** are fundamental for organizing and orchestrating workloads across the cluster.
-
-- Labels on nodes and pods guide **scheduling**, **autoscaling**, and **resource selection**.
-- Labels on Services and Ingress resources help define **routing behavior** and enable dynamic **load balancer provisioning**.
-- Labels also integrate with **IAM policies**, **cost tracking**, and **monitoring tools** for unified management.
-
-Defined declaratively in your Kubernetes manifests, labels act as the connective tissue that binds your infrastructure, workloads, and policies together.
-
----
-
-### Conclusion
-
-**Google Kubernetes Engine (GKE) delivers a managed Kubernetes experience that blends PaaS simplicity with IaaS flexibility**:
-
-- You don’t install or manage the control plane.
-- You define infrastructure declaratively.
-- Google Cloud provisions and maintains the underlying VM-based compute.
-
-Compared to fully abstracted services like **Cloud Run** or **Firestore**, GKE strikes a balance — offering control when you need it, and automation when you don’t.
-
-## GCP Solution
-
-The **GKE solution we are building** consists of a fully managed **Google Kubernetes Engine (GKE) cluster** deployed in the `us-central1` region.
-
-It includes:
-
-- A fully managed **control plane** provided by Google Cloud
-- Two distinct **node pools**:
-  - `"default"` for running the Flask-based microservices (`flask-app-1`, `flask-app-2`)
-  - `"games"` for hosting classic JavaScript games (`tetris`, `frogger`, `breakout`)
-
-Within the cluster, **pods** run containerized applications such as `flask-app-1` and `tetris`, each isolated and scalable.
-
-The solution integrates tightly with essential Google Cloud services:
-
-- **VPC Networking** for secure, cloud-native communication between services  
-- **Artifact Registry** for storing and managing Docker container images  
-- **Firestore Database** for fast, serverless NoSQL data storage  
-- A **Google Cloud Load Balancer** for distributing incoming traffic to exposed services  
-- An **NGINX Ingress Controller** for routing traffic to individual services within the cluster
-
-All infrastructure is defined using **Terraform**, while application deployment and management are performed using `kubectl`.
-
-
-![gke](./diagrams/gcp-k8s.drawio.png)
-
-This diagram shows the GCP infrastructure behind the GKE cluster, with Managed Instance Groups for Flask and game workloads, a Cloud Load Balancer provisioned by NGINX, and connected services like Firestore and Artifact Registry.
-
-![gke-infra](./diagrams/gcp-k8s-infra.drawio.png)
+| Tetris | Frogger | Breakout |
+|---|---|---|
+| ![Tetris](diagrams/tetris.png) | ![Frogger](diagrams/frogger.png) | ![Breakout](diagrams/breakout.png) |
 
 ## Prerequisites
 
 * [A Google Cloud Account](https://console.cloud.google.com/)
-* [Install gcloud CLI](https://cloud.google.com/sdk/docs/install) 
-* [Install Latest Terraform](https://developer.hashicorp.com/terraform/install)
-* [Install Postman](https://www.postman.com/downloads/) for testing
-* [Install Docker](https://docs.docker.com/engine/install/)
+* [Install gcloud CLI](https://cloud.google.com/sdk/docs/install)
+* [Install Terraform](https://developer.hashicorp.com/terraform/install)
+* [Install Docker](https://docs.docker.com/engine/install/) with `buildx`
+* [Install kubectl](https://kubernetes.io/docs/tasks/tools/) and
+  [jq](https://jqlang.github.io/jq/download/)
 
-If this is your first time watching our content, we recommend starting with this video: [GCP + Terraform: Easy Setup](https://www.youtube.com/watch?v=3spJpYX4f7I). It provides a step-by-step guide to properly configure Terraform, Packer, and the gcloud CLI.
+Put a service account key in the repository root as `credentials.json`. If
+this is your first time watching our content, we recommend starting with
+this video: [GCP + Terraform: Easy Setup](https://www.youtube.com/watch?v=3spJpYX4f7I).
 
-## Download this Repository
+## Deploy
 
 ```bash
 git clone https://github.com/mamonaco1973/gcp-k8s.git
 cd gcp-k8s
+./apply.sh
 ```
-## Build the Code
 
-Run [api_setup](api_setup.sh) and [check_env](check_env.sh) then run [apply](apply.sh).
+`check_env.sh` signs in with `credentials.json` and runs `api_setup.sh`,
+which enables the APIs and creates the Firestore database. `apply.sh` then:
+
+1. Applies **`01-gar`** (the repositories).
+2. Configures Docker for `us-central1-docker.pkg.dev` and builds and pushes
+   the Flask image and the three game images.
+3. Applies **`03-gke`**: the network, cluster, pools, Workload Identity
+   binding and the NGINX ingress.
+4. Gets credentials for `kubectl`, renders `flask-app.yaml` and `games.yaml`
+   with the project ID, and applies them.
+
+It ends by running `validate.sh`, which waits for the ingress to get an IP
+and for `/flask-app/api/gtg` to answer, then runs the smoke test:
+
+```
+NOTE: URL for GKE Deployment is http://<ingress IP>/flask-app/api/gtg?details=true
+✓ good to go passed
+✓ insert passed
+✓ verification passed
+✓ candidate list passed
+```
+
+## Try it
+
+1. Open `http://<ingress IP>/games/tetris` (or `frogger`, `breakout`) in a
+   browser, and call the Flask API with `curl` or Postman.
+2. Check the workloads:
+
+   ```bash
+   kubectl get pods,deployments,ingress
+   kubectl get pods,deployments,ingress -n games
+   kubectl get nodes
+   ```
+
+3. Test autoscaling. `stress.yaml` runs 4 replicas of a CPU load generator:
+
+   ```bash
+   kubectl apply -f stress.yaml
+   # wait about 5 minutes
+   kubectl get nodes          # the default pool grows, up to 4 nodes
+   kubectl delete -f stress.yaml
+   # wait about 5 minutes
+   kubectl get nodes          # and shrinks back
+   ```
+
+## Teardown
 
 ```bash
-~/gcp-k8s$ ./apply.sh
-NOTE: Validating that required commands are found in the PATH.
-NOTE: gcloud is found in the current PATH.
-NOTE: docker is found in the current PATH.
-NOTE: terraform is found in the current PATH.
-NOTE: All required commands are available.
-NOTE: Validating credentials.json and test the gcloud command
-Activated service account credentials for: [terraform-build@debug-project-446221.iam.gserviceaccount.com]
-NOTE: Building GAR Instance.
-Initializing the backend...
-Initializing provider plugins...
-- Finding latest version of hashicorp/google...
-- Installing hashicorp/google v6.28.0...
-- Installed hashicorp/google v6.28.0 (signed by HashiCorp)
-Terraform has created a lock file .terraform.lock.hcl to record the provider
-selections it made above. Include this file in your version control repository
-so that Terraform can guarantee to make the same selections by default when
-you run "terraform init" in the future.
-
-Terraform has been successfully initialized!
-
-[...]
+./destroy.sh
 ```
 
-### **Build Process Overview**
+## Is GKE PaaS or IaaS?
 
-The build process is organized into four phases:
+Both, in layers. Google runs the control plane, and you describe node pools
+instead of building VMs, which feels like PaaS. Underneath, each pool is a
+Compute Engine managed instance group, the autoscaler changes its size, and
+a `Service` of type `LoadBalancer` becomes a forwarding rule and target pool.
+Labels tie resources back to the cluster. GKE sits between fully managed
+services such as Firestore and plain VMs: control when you want it,
+automation when you don't.
 
-#### 1. Provision Artifact Registry Repositories
-- Creates **Google Artifact Registry** repositories for storing container images.
+## Notes
 
-#### 2. Build and Push Docker Images
-- Builds Docker images for the **Flask microservice** and three **JavaScript game apps** (Tetris, Frogger, Breakout).
-- Pushes all images to their respective **Artifact Registry repositories**.
-
-#### 3. Provision GKE Cluster
-- Deploys the **Google Kubernetes Engine (GKE) cluster** with two node pools:
-  - `flask-nodes` for the Flask microservice  
-  - `game-nodes` for the game containers
-
-#### 4. Deploy Applications Using `kubectl`
-- Connects `kubectl` to the newly created GKE cluster.
-- Applies Kubernetes manifests:
-  - [flask-app.yaml](./03-gke/yaml/flask-app.yaml.tmpl) for the microservice  
-  - [games.yaml](./03-gke/yaml/games.yaml.tmpl) for the game containers
-
-## Tour of Build Output in the GCP Console
-
-![consoles](./diagrams/consoles.gif)
-
-## Service Endpoint Summary
-
-### `/flask-app/api/gtg` (GET)
-- **Purpose**: Health check.
-- **Response**: 
-  - `{"connected": "true", "instance-id": <instance_id>}` (if `details` query parameter is provided).
-  - 200 OK with no body otherwise.
-
-### `/flask-app/api/<name>` (GET)
-- **Purpose**: Retrieve a candidate by name.
-- **Response**: 
-  - Candidate details (JSON) with status `200`.
-  - `"Not Found"` with status `404` if no candidate is found.
-
-### `/flask-app/api/<name>` (POST)
-- **Purpose**: Add or update a candidate by name.
-- **Response**: 
-  - `{"CandidateName": <name>}` with status `200`.
-  - `"Unable to update"` with status `500` on failure.
-
-### `/flask-app/api/candidates` (GET)
-- **Purpose**: Retrieve all candidates.
-- **Response**: 
-  - List of candidates (JSON) with status `200`.
-  - `"Not Found"` with status `404` if no candidates exist.
-
-### `/games/tetris` (GET)
- - **Purpose**: Loads javascript tetris game for usage in a Web Browser.
-
-      ![eks](./diagrams/tetris.png)
-
-### `/games/frogger` (GET)
- - **Purpose**: Loads javascript frogger game for usage in a Web Browser.
-
-      ![eks](./diagrams/frogger.png)
-
-### `/games/breakout` (GET)
- - **Purpose**: Loads javascript breakout game for usage in a Web Browser.
-
-      ![eks](./diagrams/breakout.png)
-
-## Kubernetes Cluster Validation and Autoscaling Test
-
-This guide walks through validating your Kubernetes cluster with `kubectl` and testing autoscaling behavior using a simple stress test.
-
----
-
-### Step 1: Validate Pod Deployments
-
-Start by listing the current pods in the default namespace:
-
-```bash
-kubectl get pods
-```
-
-Then check for any applications deployed in the custom `games` namespace:
-
-```bash
-kubectl get pods -n games
-```
-
----
-
-### Step 2: Check Deployment Health
-
-Verify the `Deployment` resources:
-
-```bash
-kubectl get deployments
-kubectl get deployments -n games
-```
-
----
-
-### Step 3: Confirm Ingress Setup
-
-Check the Ingress resources in both namespaces:
-
-```bash
-kubectl get ingress
-kubectl get ingress -n games
-```
-
----
-
-### Step 4: Check Node Availability
-
-List the current nodes in your cluster:
-
-```bash
-kubectl get nodes
-```
-
----
-
-### Step 5: Simulate Load with a Stress Test
-
-Apply a resource-intensive workload:
-
-```bash
-kubectl apply -f stress.yaml
-```
-
-⏱️ **Wait ~5 minutes** to allow autoscaling to respond.
-
-Then check the nodes again:
-
-```bash
-kubectl get nodes
-```
-
----
-
-### Step 6: Clean Up the Load Generator
-
-Remove the stress workload:
-
-```bash
-kubectl delete -f stress.yaml
-```
-
-⏱️ **Wait ~5 minutes** for the cluster to scale back down.
-
-Check node status again:
-
-```bash
-kubectl get nodes
-```
-
----
-
-### Summary
-
-This process validates:
-
-- Pod and deployment readiness
-- Ingress configuration
-- Node availability and autoscaler behavior
+- **Lab only.** The API and games are open to the internet over plain HTTP.
+- The node pools don't set a service account, so nodes run as the default
+  Compute Engine service account with the `cloud-platform` scope.
